@@ -72,3 +72,20 @@ func TestFormatClientIPWithoutCountry(t *testing.T) {
 		t.Fatalf("formatClientIP() = %q, want %q", got, want)
 	}
 }
+
+func TestCountryCodeFromIPWho(t *testing.T) {
+	countryCode, err := countryCodeFromIPWho(strings.NewReader(`{"success":true,"country_code":"us"}`))
+	if err != nil {
+		t.Fatalf("countryCodeFromIPWho() error = %v", err)
+	}
+	if countryCode != "US" {
+		t.Fatalf("countryCodeFromIPWho() = %q, want %q", countryCode, "US")
+	}
+}
+
+func TestCountryCodeFromIPWhoRejectsFailedLookup(t *testing.T) {
+	_, err := countryCodeFromIPWho(strings.NewReader(`{"success":false,"message":"Reserved range"}`))
+	if err == nil {
+		t.Fatal("countryCodeFromIPWho() error = nil, want an error")
+	}
+}

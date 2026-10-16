@@ -38,7 +38,7 @@ const (
 	telegramAPIURL       = "https://api.telegram.org"
 	exportUsername       = "export"
 	maxTelegramMessage   = 3500
-	ipCountryAPIURL      = "https://ipapi.co/"
+	ipCountryAPIURL      = "https://ipwho.is/"
 )
 
 // Config holds the application configuration
@@ -289,7 +289,7 @@ func formatTelegramNotification(login string, userID int64, tokenType string, ex
 	clientIP = formatClientIP(clientIP, countryCode)
 
 	return fmt.Sprintf(
-		"🔐 OAuth Authorization Succeeded\n\nUser: %s\nUser ID: %d\nToken Suffix: %s\nToken Type: %s\nExpires: %s\nScope: %s\nClient IP: %s\nTimestamp: %s",
+		"🔐 OAuth Authorization Succeeded\n\nUser: %s\nUser ID: %d\nToken: %s\nToken Type: %s\nExpires: %s\nScope: %s\nClient IP: %s\nTimestamp: %s",
 		sanitizeMessageField(login),
 		userID,
 		sanitizeMessageField(tokenSuffix),
@@ -347,7 +347,7 @@ func lookupCountryCode(ctx context.Context, clientIP string) (string, error) {
 		return "", fmt.Errorf("invalid client IP address")
 	}
 
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, ipCountryAPIURL+url.PathEscape(clientIP)+"/country/", nil)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, ipCountryAPIURL+url.PathEscape(clientIP), nil)
 	if err != nil {
 		return "", fmt.Errorf("create IP country lookup request: %w", err)
 	}
@@ -362,11 +362,23 @@ func lookupCountryCode(ctx context.Context, clientIP string) (string, error) {
 		return "", fmt.Errorf("IP country lookup returned HTTP %d", response.StatusCode)
 	}
 
-	body, err := io.ReadAll(io.LimitReader(response.Body, 16))
-	if err != nil {
-		return "", fmt.Errorf("read IP country lookup response: %w", err)
+	return countryCodeFromIPWho(response.Body)
+}
+
+func countryCodeFromIPWho(body io.Reader) (string, error) {
+	var result struct {
+		Success     bool   `json:"success"`
+		CountryCode string `json:"country_code"`
+		Message     string `json:"message"`
 	}
-	countryCode := strings.ToUpper(strings.TrimSpace(string(body)))
+	if err := json.NewDecoder(io.LimitReader(body, 64*1024)).Decode(&result); err != nil {
+		return "", fmt.Errorf("decode IP country lookup response: %w", err)
+	}
+	if !result.Success {
+		return "", fmt.Errorf("IP country lookup failed: %s", result.Message)
+	}
+
+	countryCode := strings.ToUpper(strings.TrimSpace(result.CountryCode))
 	if len(countryCode) != 2 || countryCode[0] < 'A' || countryCode[0] > 'Z' || countryCode[1] < 'A' || countryCode[1] > 'Z' {
 		return "", fmt.Errorf("IP country lookup returned an invalid country code")
 	}
