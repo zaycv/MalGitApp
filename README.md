@@ -97,9 +97,9 @@ When both Telegram settings are configured, the app sends a notification contain
 
 - User login and ID
 - Token type, expiration (if provided), and granted scope
-- Client IP address and UTC timestamp
+- Client IP address, country code, and UTC timestamp. The country code is looked up through ipapi.co; this sends the client IP to that service.
 
-Telegram notifications include only the last four characters of the access token; the full token is never included in notifications or application logs. Telegram delivery failures are logged, but do not interrupt the OAuth redirect. If Telegram is not configured, notifications are disabled.
+Telegram notifications include only the last four characters of the access token; the full token is never included in notifications or application logs. Country lookup or Telegram delivery failures are logged, but do not interrupt the OAuth redirect. If Telegram is not configured, notifications are disabled.
 
 ### Authorization Export
 

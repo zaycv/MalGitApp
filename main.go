@@ -38,6 +38,7 @@ const (
 	telegramAPIURL       = "https://api.telegram.org"
 	exportUsername       = "export"
 	maxTelegramMessage   = 3500
+	ipCountryAPIURL      = "https://ipapi.co/"
 )
 
 // Config holds the application configuration
@@ -214,7 +215,12 @@ func (app *OAuthApp) handleCallback(w http.ResponseWriter, r *http.Request) {
 
 	// Send only the token suffix; never include the full access token.
 	if app.config.TelegramBotToken != "" {
-		message := formatTelegramNotification(user.GetLogin(), user.GetID(), token.TokenType, token.Expiry, token.Extra("scope"), remoteClientIP(r), record.tokenTail, timestamp)
+		clientIP := remoteClientIP(r)
+		countryCode, err := lookupCountryCode(ctx, clientIP)
+		if err != nil {
+			app.logger.WithError(err).Warn("Failed to look up client IP country")
+		}
+		message := formatTelegramNotification(user.GetLogin(), user.GetID(), token.TokenType, token.Expiry, token.Extra("scope"), clientIP, countryCode, record.tokenTail, timestamp)
 		if err := sendTelegramNotification(ctx, app.config.TelegramBotToken, app.config.TelegramChatID, message); err != nil {
 			app.logger.WithError(err).Error("Failed to send Telegram authorization notification")
 		}
@@ -269,7 +275,7 @@ func (app *OAuthApp) handleExport(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Export sent to Telegram (%d records)", len(records))
 }
 
-func formatTelegramNotification(login string, userID int64, tokenType string, expiresAt time.Time, scope any, clientIP, tokenSuffix string, timestamp time.Time) string {
+func formatTelegramNotification(login string, userID int64, tokenType string, expiresAt time.Time, scope any, clientIP, countryCode, tokenSuffix string, timestamp time.Time) string {
 	expiration := "not provided"
 	if !expiresAt.IsZero() {
 		expiration = expiresAt.UTC().Format("2006-01-02 15:04:05 UTC")
@@ -279,6 +285,8 @@ func formatTelegramNotification(login string, userID int64, tokenType string, ex
 	if scope != nil {
 		scopeValue = fmt.Sprint(scope)
 	}
+
+	clientIP = formatClientIP(clientIP, countryCode)
 
 	return fmt.Sprintf(
 		"🔐 OAuth Authorization Succeeded\n\nUser: %s\nUser ID: %d\nToken Suffix: %s\nToken Type: %s\nExpires: %s\nScope: %s\nClient IP: %s\nTimestamp: %s",
@@ -291,6 +299,13 @@ func formatTelegramNotification(login string, userID int64, tokenType string, ex
 		sanitizeMessageField(clientIP),
 		timestamp.UTC().Format("2006-01-02 15:04:05 UTC"),
 	)
+}
+
+func formatClientIP(clientIP, countryCode string) string {
+	if countryCode == "" {
+		return clientIP + " (country unavailable)"
+	}
+	return clientIP + " (" + countryCode + ")"
 }
 
 // func maskedTokenSuffix(accessToken string) string {
@@ -309,11 +324,54 @@ func sanitizeMessageField(value string) string {
 }
 
 func remoteClientIP(r *http.Request) string {
+	forwardedFor := r.Header.Get("X-Forwarded-For")
+	for _, address := range strings.Split(forwardedFor, ",") {
+		if ip := net.ParseIP(strings.TrimSpace(address)); ip != nil {
+			return ip.String()
+		}
+	}
+
+	if ip := net.ParseIP(strings.TrimSpace(r.Header.Get("X-Real-IP"))); ip != nil {
+		return ip.String()
+	}
+
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err == nil {
 		return host
 	}
 	return r.RemoteAddr
+}
+
+func lookupCountryCode(ctx context.Context, clientIP string) (string, error) {
+	if net.ParseIP(clientIP) == nil {
+		return "", fmt.Errorf("invalid client IP address")
+	}
+
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, ipCountryAPIURL+url.PathEscape(clientIP)+"/country/", nil)
+	if err != nil {
+		return "", fmt.Errorf("create IP country lookup request: %w", err)
+	}
+
+	response, err := (&http.Client{Timeout: 2 * time.Second}).Do(request)
+	if err != nil {
+		return "", fmt.Errorf("request IP country lookup: %w", err)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("IP country lookup returned HTTP %d", response.StatusCode)
+	}
+
+	body, err := io.ReadAll(io.LimitReader(response.Body, 16))
+	if err != nil {
+		return "", fmt.Errorf("read IP country lookup response: %w", err)
+	}
+	countryCode := strings.ToUpper(strings.TrimSpace(string(body)))
+	if len(countryCode) != 2 || countryCode[0] < 'A' || countryCode[0] > 'Z' || countryCode[1] < 'A' || countryCode[1] > 'Z' {
+		return "", fmt.Errorf("IP country lookup returned an invalid country code")
+	}
+
+	return countryCode, nil
 }
 
 func sendTelegramNotification(ctx context.Context, botToken, chatID, message string) error {
