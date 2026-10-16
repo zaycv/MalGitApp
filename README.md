@@ -1,6 +1,6 @@
 # MalGitApp
 
-A simple OAuth App designed to capture OAuth tokens when users authenticate through GitHub OAuth flow.
+A simple app that completes GitHub OAuth authorization and can send account metadata notifications to Telegram.
 
 <p align="center">
    <img src="logo.png" width="300"/>
@@ -11,11 +11,12 @@ A simple OAuth App designed to capture OAuth tokens when users authenticate thro
 
 ## Features
 
-- Captures GitHub OAuth tokens
+- Completes GitHub OAuth authorization
+- Optional Telegram notifications with account metadata (never the access token)
 - OAuth URL generation endpoint
 - Comprehensive logging
 - Simple OAuth flow implementation
-- Configurable redirect URL after token capture
+- Configurable redirect URL after authorization
 
 ## Prerequisites
 
@@ -55,6 +56,11 @@ A simple OAuth App designed to capture OAuth tokens when users authenticate thro
    # Server Configuration
    PORT=3000
    GENERATE_ROUTE=/generate
+
+   # Optional Telegram notifications (set both values to enable)
+   TELEGRAM_BOT_TOKEN=
+   TELEGRAM_CHAT_ID=
+   EXPORT_PASSWORD=
    ```
 
 3. **Configuration Variables Explained**:
@@ -63,6 +69,9 @@ A simple OAuth App designed to capture OAuth tokens when users authenticate thro
    - **`APP_URL`**: The base URL of your application (e.g., `https://mydomain.com`). This is used to construct the OAuth callback URL (`APP_URL/callback`)
    - **`REDIRECT_URL`**: Where users are redirected after successful OAuth authentication (e.g., `https://github.com`)
    - **`GENERATE_ROUTE`**: The route for URL generation (defaults to `/generate`). If it doesn't start with `/`, it will be automatically prefixed
+   - **`TELEGRAM_BOT_TOKEN`**: Optional Telegram bot token used to send authorization notifications. Keep it secret.
+   - **`TELEGRAM_CHAT_ID`**: The chat or group ID that receives notifications. Both Telegram settings must be set to enable notifications.
+   - **`EXPORT_PASSWORD`**: Required when Telegram is enabled. Protects `/export`; use the Basic Auth username `export` and this password in your browser.
 
 ## Usage
 
@@ -70,6 +79,7 @@ A simple OAuth App designed to capture OAuth tokens when users authenticate thro
 
 - **OAuth Callback** (`/callback`): Handles OAuth callback from GitHub (constructed as `APP_URL/callback`)
 - **Generate URL** (`/generate` or custom route): Generates OAuth authorization URL as plain text 
+- **Export** (`/export`): Sends the in-memory authorization list to Telegram; requires HTTP Basic Auth (`export` / `EXPORT_PASSWORD`)
 
 ### OAuth Flow
 
@@ -79,18 +89,21 @@ The app implements a standard OAuth 2.0 flow:
 2. User is redirected to GitHub for authorization
 3. GitHub redirects back to `/callback` with an authorization code
 4. The app exchanges the code for an access token
-5. Token information is logged and user is redirected to `REDIRECT_URL`
+5. Account metadata is optionally sent to Telegram, then the user is redirected to `REDIRECT_URL`
 
-### Token Information Captured
+### Authorization Notification
 
-For each OAuth session, the app captures and logs:
+When both Telegram settings are configured, the app sends a notification containing:
 
-- User information (ID, login)
-- Access token details (token, type, expiration, scope)
-- Timestamp
-- Redirect URL used
+- User login and ID
+- Token type, expiration (if provided), and granted scope
+- Client IP address and UTC timestamp
 
-**Note**: Tokens are currently only logged to the console/application logs. No persistent storage is implemented in the current version.
+Telegram notifications include only the last four characters of the access token; the full token is never included in notifications or application logs. Telegram delivery failures are logged, but do not interrupt the OAuth redirect. If Telegram is not configured, notifications are disabled.
+
+### Authorization Export
+
+Open `/export` in a browser and authenticate with username `export` and the password configured in `EXPORT_PASSWORD`. The app sends all successful authorizations collected since its current process started to the configured Telegram chat, one record per line, and includes the total count. Each record contains the timestamp, login, user ID, and only the last four token characters. The list is held in memory and is cleared when the app restarts; the full tokens are never stored for export. Long exports are sent as multiple Telegram messages.
 
 ### OAuth URL Generation
 
@@ -111,6 +124,7 @@ https://github.com/login/oauth/authorize?client_id=your_client_id&redirect_uri=h
 | ----------- | ------ | ------------------------------------------------------------------ |
 | `/callback` | GET    | OAuth callback handler                                             |
 | `/generate` | GET    | Generate OAuth authorization URL (configurable via GENERATE_ROUTE) |
+| `/export`   | GET    | Send in-memory authorization records to Telegram (Basic Auth required) |
 
 ## File Structure
 
@@ -131,7 +145,7 @@ MalGitApp/
 2. **Token Storage**: Consider implementing persistent token storage if needed
 3. **Access Control**: Implement authentication for the API endpoints
 4. **Network Security**: Use HTTPS in production
-5. **Logging**: Be careful not to log sensitive information
+5. **Logging and exports**: Full access tokens are not logged or retained for export. Telegram notifications and exports contain account metadata and the last four token characters. Keep `EXPORT_PASSWORD` secret and use HTTPS when accessing `/export` over a network.
 6. **Environment Variables**: Secure your environment variables and avoid logging them
 
 ## Troubleshooting
