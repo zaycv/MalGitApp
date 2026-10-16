@@ -289,7 +289,7 @@ func formatTelegramNotification(login string, userID int64, tokenType string, ex
 	clientIP = formatClientIP(clientIP, countryCode)
 
 	return fmt.Sprintf(
-		"🔐 OAuth Authorization Succeeded\n\nUser: %s\nUser ID: %d\nToken: %s\nToken Type: %s\nExpires: %s\nScope: %s\nClient IP: %s\nTimestamp: %s",
+		"🔐 OAuth Authorization Succeeded\n\n👤 User: %s\nUser ID: %d\n🔑 Token: <code>%s</code>\nToken Type: %s\nExpires: %s\nScope: %s\n🌍 Client IP: %s\nTimestamp: %s",
 		sanitizeMessageField(login),
 		userID,
 		sanitizeMessageField(tokenSuffix),
@@ -302,21 +302,12 @@ func formatTelegramNotification(login string, userID int64, tokenType string, ex
 }
 
 func formatClientIP(clientIP, countryCode string) string {
+	flag := string(rune(0x1F1E6+int(countryCode[0]-'A'))) + string(rune(0x1F1E6+int(countryCode[1]-'A')))
 	if countryCode == "" {
 		return clientIP + " (country unavailable)"
 	}
-	return clientIP + " (" + countryCode + ")"
+	return clientIP + " (" + countryCode + flag + ")"
 }
-
-// func maskedTokenSuffix(accessToken string) string {
-// 	if accessToken == "" {
-// 		return "not provided"
-// 	}
-// 	if len(accessToken) <= 4 {
-// 		return strings.Repeat("*", len(accessToken))
-// 	}
-// 	return "..." + accessToken[len(accessToken)-4:]
-// }
 
 func sanitizeMessageField(value string) string {
 	value = strings.ReplaceAll(value, "\r", " ")
