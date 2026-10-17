@@ -289,7 +289,7 @@ func formatTelegramNotification(login string, userID int64, tokenType string, ex
 	clientIP = formatClientIP(clientIP, countryCode)
 
 	return fmt.Sprintf(
-		"🔐 OAuth Authorization Succeeded\n\n👤 User: %s\nUser ID: %d\n🔑 Token: `%s`\nToken Type: %s\nExpires: %s\nScope: %s\n🌍 Client IP: %s\nTimestamp: %s",
+		"🔐 OAuth Authorization Succeeded\n\n👤 User: https://github.com/%s\nUser ID: %d\n🔑 Token: `%s`\nToken Type: %s\nExpires: %s\nScope: %s\n🌍 Client IP: %s\nTimestamp: %s",
 		sanitizeMessageField(login),
 		userID,
 		sanitizeMessageField(tokenSuffix),
