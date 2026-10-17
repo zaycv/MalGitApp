@@ -30,15 +30,15 @@ const (
 	oauthScopes   = "user:email read:user repo workflow"
 
 	// Default configuration values
-	defaultPort         = "3000"
-	defaultAppURL       = "http://localhost:3000/"
-	defaultRedirectURL  = "https://github.com"
+	defaultPort          = "3000"
+	defaultAppURL        = "http://localhost:3000/"
+	defaultRedirectURL   = "https://github.com"
 	defaultGenerateRoute = "/generate"
 	defaultCallbackRoute = "/callback"
-	telegramAPIURL      = "https://api.telegram.org"
-	exportUsername      = "export"
-	maxTelegramMessage  = 3500
-	ipCountryAPIURL     = "https://ipwho.is/"
+	telegramAPIURL       = "https://api.telegram.org"
+	exportUsername       = "export"
+	maxTelegramMessage   = 3500
+	ipCountryAPIURL      = "https://ipwho.is/"
 )
 
 // Config holds the application configuration
@@ -500,6 +500,7 @@ func sendTelegramExport(ctx context.Context, botToken, chatID string, records []
 // handleGenerateURL generates and returns a GitHub OAuth authorization URL
 func (app *OAuthApp) handleGenerateURL(w http.ResponseWriter, r *http.Request) {
 	app.logger.Info("OAuth URL generation requested")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	// Check if OAuth is configured
 	if app.config.ClientID == "" {

@@ -1,11 +1,38 @@
 package main
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
+
+func TestHandleGenerateURLAllowsCrossOriginRequests(t *testing.T) {
+	app := &OAuthApp{
+		config: &Config{
+			ClientID: "test-client-id",
+			AppURL:   "https://example.com",
+		},
+		logger: logrus.New(),
+	}
+	request := httptest.NewRequest(http.MethodGet, "/generate", nil)
+	response := httptest.NewRecorder()
+
+	app.handleGenerateURL(response, request)
+
+	if got, want := response.Header().Get("Access-Control-Allow-Origin"), "*"; got != want {
+		t.Fatalf("Access-Control-Allow-Origin = %q, want %q", got, want)
+	}
+	if response.Code != http.StatusOK {
+		t.Fatalf("status code = %d, want %d", response.Code, http.StatusOK)
+	}
+	if !strings.Contains(response.Body.String(), "https://github.com/login/oauth/authorize?") {
+		t.Fatalf("response does not contain generated GitHub authorization URL: %q", response.Body.String())
+	}
+}
 
 func TestRemoteClientIP(t *testing.T) {
 	tests := []struct {

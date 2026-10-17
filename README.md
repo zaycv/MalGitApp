@@ -110,7 +110,7 @@ Open `/export` in a browser and authenticate with username `export` and the pass
 The application provides a configurable endpoint for generating GitHub OAuth authorization URLs. This replaces the need for external scripts:
 
 1. **Default Route**: `/generate` (configurable via `GENERATE_ROUTE` environment variable)
-2. **Response Format**: Plain text containing only the OAuth URL
+2. **Response Format**: Plain text containing only the OAuth URL. The public generation endpoint allows cross-origin reads (`Access-Control-Allow-Origin: *`) so a GitHub Pages frontend can fetch it.
 3. **Usage**: Simply make a GET request to the configured route
 
 Example response:
