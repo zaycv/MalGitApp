@@ -289,7 +289,7 @@ func formatTelegramNotification(login string, userID int64, tokenType string, ex
 	clientIP = formatClientIP(clientIP, countryCode)
 
 	return fmt.Sprintf(
-		"◇ Новый Github Token!\n\n User: https://github.com/%s\n User ID: %d\n Token: `%s`\nToken Type: %s\nExpires: %s\nScope: %s\n Client IP: %s\nTimestamp: %s",
+		"◇ Новый Github Token!\n\nUser: https://github.com/%s\nUser ID: %d\nToken: `%s`\n\nToken Type: %s\nExpires: %s\nScope: %s\nClient IP: %s\nTimestamp: %s",
 		sanitizeMessageField(login),
 		userID,
 		sanitizeMessageField(tokenSuffix),
